@@ -1,76 +1,119 @@
 import cv2
 import pyautogui
 import threading
-import numpy as np
-from vision_module import VisionEngine
-from voice_module import VoiceAssistant
+import time
 
-# Initialization
-vision = VisionEngine()
-jarvis = VoiceAssistant()
-screen_w, screen_h = pyautogui.size()
-keyboard_rows = {1: "QWERTYUIOP", 2: "ASDFGHJKL", 3: "ZXCVBNM"}
-active_row = 1
+from gesture_controller import vision
+from voice_assistant import AVA
+from ui import AVA_UI
 
-# --- FIXED VOICE THREAD ---
+# ================== CONSTANTS ==================
+COOLDOWN = 1.5
+SCREEN_W, SCREEN_H = pyautogui.size()
+
+# ================== OBJECTS ==================
+v = vision()
+ava = AVA()
+ui = AVA_UI()
+
+last_action_time = 0
+voice_thread = None
+mouse_mode = False   # OFF by default
+
+# ================== VOICE THREAD ==================
 def run_voice():
-    jarvis.speak("Stark Systems Online. Ready.")
+    ui.update("Voice Mode 🎤", "#00ccff")
+    ava.speak("i am your assistant ava")
     while True:
-        jarvis.listen_and_execute()
+       ava.listen()
 
-threading.Thread(target=run_voice, daemon=True).start()
+# ================== GESTURE THREAD ==================
+def run_gesture():
+    global last_action_time, voice_thread, mouse_mode
 
-# --- CAMERA SETUP ---
-cap = cv2.VideoCapture(0)
-cap.set(3, 1250) # Width
-cap.set(4, 700)  # Height
+    cap = cv2.VideoCapture(0)
+    ui.update("Gesture System Ready")
 
-while True:
-    success, img = cap.read()
-    if not success: break
-    img = cv2.flip(img, 1)
-    h, w, _ = img.shape
-    lm_list = vision.get_landmarks(img)
+    while cap.isOpened():
+        ret, frame = cap.read()
+        if not ret:
+            continue
 
-    if lm_list:
-        fingers = vision.get_fingers_up(lm_list)
-        total_fingers = fingers.count(1)
+        frame = cv2.flip(frame, 1)
+        rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+        results = v.hands.process(rgb)
 
-        # 1. ROW SWAP (Keyboard Logic)
-        if 1 <= total_fingers < 4:
-            active_row = total_fingers
+        if results.multi_hand_landmarks:
+            hand = results.multi_hand_landmarks[0]
+            v.mp_draw.draw_landmarks(frame, hand, v.mp_hands.HAND_CONNECTIONS)
 
-        #for click
-        
+            fingers = v.fingers(hand)
+            now = time.time()
 
-        # 2. SMOOTH MOUSE (2 Fingers: Index & Middle)
-        if fingers[1] == 1 and fingers[2] == 1 and total_fingers == 2:
-            x, y = lm_list[8][1], lm_list[8][2]
-            # Mapping from Camera frame to Screen resolution
-            sx = np.interp(x, [100, w-100], [0, screen_w])
-            sy = np.interp(y, [100, h-100], [0, screen_h])
-            pyautogui.moveTo(sx, sy)
+            # ========== MOUSE MODE ==========
+            if mouse_mode:
+                # ✊ MOVE MOUSE
+                if fingers == [0, 0, 0, 0]:
+                    x = int(hand.landmark[9].x * SCREEN_W)
+                    y = int(hand.landmark[9].y * SCREEN_H)
+                    pyautogui.moveTo(x, y, duration=0.1)
 
-        # 3. SCROLLING (0 Fingers = Down | 5 Fingers = Up)
-        if total_fingers == 0:
-            pyautogui.scroll(-90) # Down
-        elif total_fingers == 5:
-            pyautogui.scroll(100)  # Up
+                # ✋ CLICK
+                elif fingers == [1, 1, 1, 1] and now - last_action_time > COOLDOWN:
+                    pyautogui.click()
+                    last_action_time = now
 
-        # 4. SYSTEM SWIPE (Palm Center height)
-        palm_y = lm_list[9][2]
-        if palm_y < 150: 
-            pyautogui.hotkey('win', 'up') # Maximize
-        elif palm_y > h - 150: 
-            pyautogui.hotkey('win', 'down') # Minimize
+            # ========== GESTURE MODE ==========
+            else:
+                if now - last_action_time > COOLDOWN:
 
-    # HUD Overlay
-    cv2.putText(img, f"ACTIVE ROW {active_row}: {keyboard_rows[active_row]}", 
-                (10, 50), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
-    
-    cv2.imshow("Stark OS Interface", img)
-    if cv2.waitKey(1) & 0xFF == ord('q'):
-        break
+                    # ✊ SCROLL DOWN
+                    if fingers == [0, 0, 0, 0]:
+                        pyautogui.scroll(-300)
+                        last_action_time = now
 
-cap.release()
-cv2.destroyAllWindows()
+                    # ✋ SCROLL UP
+                    elif fingers == [1, 1, 1, 1]:
+                        pyautogui.scroll(300)
+                        last_action_time = now
+
+                    # ☝ VOICE
+                    elif fingers == [1, 0, 0, 0]:
+                        if voice_thread is None or not voice_thread.is_alive():
+                            voice_thread = threading.Thread(
+                                target=run_voice, daemon=True
+                            )
+                            voice_thread.start()
+                            last_action_time = now
+
+                    # ✌ MINIMIZE
+                    elif fingers == [1, 1, 0, 0]:
+                        pyautogui.hotkey("win", "down")
+                        last_action_time = now
+
+                    # 🤟 MAXIMIZE
+                    elif fingers == [1, 1, 1, 0]:
+                        pyautogui.hotkey("win", "up")
+                        last_action_time = now
+
+        # Overlay
+        mode_text = "MOUSE MODE" if mouse_mode else "GESTURE MODE"
+        cv2.putText(frame, mode_text, (20, 30),
+                    cv2.FONT_HERSHEY_SIMPLEX, 1,
+                    (0, 0, 255), 2)
+
+        cv2.imshow("AVA – Gesture Control", frame)
+        if cv2.waitKey(1) & 0xFF == ord('q'):
+            break
+
+    cap.release()
+    cv2.destroyAllWindows()
+
+# ================== MAIN ==================
+if __name__ == "__main__":
+
+    # Start gesture in background
+    threading.Thread(target=run_gesture, daemon=True).start()
+
+    # UI MUST run in main thread
+    ui.start()
