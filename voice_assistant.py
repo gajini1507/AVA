@@ -1,7 +1,8 @@
-import speech_recognition as sr
-import pyttsx3
+import speech_recognition as sr # type: ignore
+import pyttsx3 # type: ignore
 import webbrowser
 import subprocess
+import main
 
 class AVA:
     def __init__(self):
@@ -20,51 +21,43 @@ class AVA:
             audio = self.recognizer.listen(source)
             return self.recognizer.recognize_google(audio).lower()
 
+
     def run(self):
         self.speak("Hi, I am AVA")
         self.speak("what you want")
         while True:
             print("listening.....")
             try:
-                command = self.listen()
+                text = self.listen()
 
-                
-                if command is None:
-                   return
-
-                command = command.lower()
-                global mouse_mode
-                if "wake up" in command:
-                       mouse_mode = True
+                text = text.lower()
+                if "open mouse" in text:
+                       main.set_mouse_mode = True
                        self.speak("Mouse control activated")
 
-                elif "sleep" in command:
-                            mouse_mode = False
+                elif ( "sleep" or "stop" ) in text:
+                            main.set_mouse_mode = False
                             self.speak("Mouse control deactivated")
 
-                elif "stop" in command:
-                            mouse_mode = False
-                            self.speak("Okay, stopping mouse mode")
-
-                elif "search for" in command:
-                     query = command.replace("search for","").strip()
+                elif "search for" in text:
+                     query = text.replace("search for","").strip()
                      self.speak(f"opening gooogle for {query}")
                      webbrowser.open(f"https://www.google.com/search?q={query}")
 
-                elif "open youtube" in command:
+                elif "open youtube" in text:
                     self.speak("Opening YouTube")
                     webbrowser.open("https://youtube.com")
 
-                elif "open app" in command:
-                     query = command.replace("open app","").strip()
+                elif "open app" in text:
+                     query = text.replace("open app","").strip()
                      self.speak(f"opening app {query}")
                      subprocess.Popen(f"query".exe)
                      
 
-                elif "open browser" in command:
+                elif "open browser" in text:
                     subprocess.Popen("chrome.exe")
 
-                elif "exit" in command:
+                elif "exit" in text: # type: ignore
                     self.speak("Goodbye")
                     break
 

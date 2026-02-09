@@ -1,4 +1,4 @@
-import mediapipe as mp
+import mediapipe as mp # type: ignore
 
 
 class vision:

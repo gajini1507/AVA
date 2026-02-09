@@ -1,8 +1,7 @@
-import cv2
-import pyautogui
+import cv2 # type: ignore
+import pyautogui  # type: ignore
 import threading
 import time
-
 from gesture_controller import vision
 from voice_assistant import AVA
 from ui import AVA_UI
@@ -11,6 +10,14 @@ from ui import AVA_UI
 COOLDOWN = 1.5
 SCREEN_W, SCREEN_H = pyautogui.size()
 
+mouse_mode = False
+def set_mouse_mode(value: bool):
+    global mouse_mode
+    mouse_mode = value
+
+def get_mouse_mode() -> bool:
+    return mouse_mode
+
 # ================== OBJECTS ==================
 v = vision()
 ava = AVA()
@@ -18,18 +25,18 @@ ui = AVA_UI()
 
 last_action_time = 0
 voice_thread = None
-mouse_mode = False   # OFF by default
+
 
 # ================== VOICE THREAD ==================
 def run_voice():
-    ui.update("Voice Mode 🎤", "#00ccff")
-    ava.speak("i am your assistant ava")
+    print("waiting for wake...")
     while True:
-       ava.listen()
+        ui.update("Voice Mode 🎤", "#00ccff")
+        ava.run()
 
 # ================== GESTURE THREAD ==================
 def run_gesture():
-    global last_action_time, voice_thread, mouse_mode
+    global last_action_time, voice_thread
 
     cap = cv2.VideoCapture(0)
     ui.update("Gesture System Ready")
@@ -51,24 +58,27 @@ def run_gesture():
             now = time.time()
 
             # ========== MOUSE MODE ==========
-            if mouse_mode:
-                # ✊ MOVE MOUSE
-                if fingers == [0, 0, 0, 0]:
+            if get_mouse_mode():
+                ui.update(
+                "Mouse Mode ON 🖱" if get_mouse_mode else "Gesture Mode ✋",
+                "#00ff00" if mouse_mode else "#ff5555" )
+                last_action_time = now
+
+                if fingers == [1, 1, 0, 0]:
                     x = int(hand.landmark[9].x * SCREEN_W)
                     y = int(hand.landmark[9].y * SCREEN_H)
-                    pyautogui.moveTo(x, y, duration=0.1)
+                    pyautogui.moveTo(x, y, duration=0.05)
 
-                # ✋ CLICK
-                elif fingers == [1, 1, 1, 1] and now - last_action_time > COOLDOWN:
+                elif fingers == [0, 0, 0, 0]:
                     pyautogui.click()
-                    last_action_time = now
+                    time.sleep(0.3)
 
             # ========== GESTURE MODE ==========
             else:
                 if now - last_action_time > COOLDOWN:
 
                     # ✊ SCROLL DOWN
-                    if fingers == [0, 0, 0, 0]:
+                    if fingers == [0, 0, 0, 0] and mouse_mode == False:
                         pyautogui.scroll(-300)
                         last_action_time = now
 
@@ -77,8 +87,8 @@ def run_gesture():
                         pyautogui.scroll(300)
                         last_action_time = now
 
-                    # ☝ VOICE
-                    elif fingers == [1, 0, 0, 0]:
+                    #☝VOICE
+                    elif fingers == [1,0,0,0]:
                         if voice_thread is None or not voice_thread.is_alive():
                             voice_thread = threading.Thread(
                                 target=run_voice, daemon=True
@@ -87,12 +97,12 @@ def run_gesture():
                             last_action_time = now
 
                     # ✌ MINIMIZE
-                    elif fingers == [1, 1, 0, 0]:
+                    elif fingers == [1, 1, 0, 0] and mouse_mode == False:
                         pyautogui.hotkey("win", "down")
                         last_action_time = now
 
                     # 🤟 MAXIMIZE
-                    elif fingers == [1, 1, 1, 0]:
+                    elif fingers == [1, 1, 1, 0] and mouse_mode == False:
                         pyautogui.hotkey("win", "up")
                         last_action_time = now
 
