@@ -2,9 +2,11 @@ import speech_recognition as sr # type: ignore
 import pyttsx3 # type: ignore
 import webbrowser
 import subprocess
-import main
+
 
 class AVA:
+    mouse_mode = False
+
     def __init__(self):
         self.engine = pyttsx3.init()
         self.engine.setProperty("rate", 160)
@@ -29,15 +31,22 @@ class AVA:
             print("listening.....")
             try:
                 text = self.listen()
-
                 text = text.lower()
-                if "open mouse" in text:
-                       main.set_mouse_mode = True
-                       self.speak("Mouse control activated")
+                print(f"user: {text}")
 
-                elif ( "sleep" or "stop" ) in text:
-                            main.set_mouse_mode = False
-                            self.speak("Mouse control deactivated")
+                voice_command =["power on mouse","power of mouse",f"search for {query}","open youtube",f"open app {query}","open browser","exit"]
+
+                if text not in voice_command:
+                    print(f"'{text}' is recognized")
+                    self.speak(f"{text} is not recognized" )
+
+                elif "power on mouse" in text:
+                    self.mouse_mode = True
+                    self.speak("Mouse control activated")
+
+                elif "power of mouse" in text:
+                    self.mouse_mode = False
+                    self.speak("Mouse control deactivated")
 
                 elif "search for" in text:
                      query = text.replace("search for","").strip()
@@ -55,10 +64,10 @@ class AVA:
                      
 
                 elif "open browser" in text:
-                    subprocess.Popen("chrome.exe")
+                    subprocess.Popen("Google Chrome.lnk")
 
                 elif "exit" in text: # type: ignore
-                    self.speak("Goodbye")
+                    self.speak("thank you for using")
                     break
 
             except:
