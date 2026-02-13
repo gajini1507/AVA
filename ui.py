@@ -1,31 +1,16 @@
 import tkinter as tk
-import threading
 import numpy as np
-import sounddevice as sd
-from voice_assistant import AVA
 
 class AVA_UI:
     
-    def __init__(self):
+    def __init__(self,ava):
         self.root = tk.Tk()
         self.root.title("AVA – Accessible Virtual Assistant")
         self.root.geometry("800x600")
         self.root.configure(bg="#121212")
         self.root.resizable(False, False)
 
-        self.stream = sd.InputStream(callback=self.audio_callback)
-        self.stream.start()
-
-
-        self.canvas = tk.Canvas(self.root,width=300,height=100,bg="#121212")
-        self.canvas.place(x=270,y=280)
-        
-        self.audio_data = np.zeros(1024) 
-
-        stream = sd.InputStream(callback= self.audio_callback)
-        stream.start()
-        self.wave()
-        
+        self.ava = ava
 
         self.title = tk.Label(
             self.root,
@@ -56,27 +41,13 @@ class AVA_UI:
         )
         self.status.pack()
 
-        self.lab = tk.Label(
-            self.root,
-            text="speak",
-            bg="#121212",
-            fg="#00ff99",
-            font=("Segoe UI",10,"bold")
-            
-            )
-        self.lab.place(x=350,y=200)
+        self.canvas = tk.Label(
 
-        self.btn = tk.Button(
-        self.root,
-        text="Start Listening",
-        command=self.start_listen,
-        bg="#00ff99",
-        fg="black",
-        font=("Segoe UI", 6, "bold")
-             )
-        self.btn.place(x=380,y=450)
+        )
+        self.canvas.place(x=250,y=280)
 
-
+       
+        
     def update(self, text, color="#00ff99"):
         self.status.after(0, lambda: self.status.config(text=text, fg=color))
 
@@ -91,27 +62,34 @@ class AVA_UI:
         self.canvas.delete("all")
         width = 300
         height= 100
-        step = width/len(self.audio_data)
+        center_y = height // 2
+        num_dots = 25
+        spacing = width // num_dots
 
-        for i,value in enumerate(self.audio_data):
-            x = i*step
-            y= value*100
-            self.color = "cyan" if value > 0.01 else "#222222"
-            self.canvas.create_line(x,height/2-y,x,height/2+y,fill="cyan")
 
+        for i in range(num_dots):
+            x = i * spacing +10
+            if self.ava.mode == "listening":
+                y_offset = np.random.randint(-20,20)
+                color = "#00ff99"
+
+            elif self.ava.mode == "speaking":
+                y_offset = np.random.randint(-30,30)
+                color = "#00ff99"
+            
+            else:
+                y_offset = 0
+                color  = "#333333"
+
+                self.canvas.create_oval(
+                    x,
+                    center_y + y_offset,
+                    x+6,
+                    center_y + y_offset + 6,
+                    fill = color,
+                    outline = color
+                )
         self.root.after(30,self.wave)
-
-    
-
-    def mic(self):
-        self.root.after(0, lambda: self.lab.config(text="Listening..."))
-        text = AVA.listen()
-        self.root.after(0, lambda: self.lab.config(text=text))
-
-
-
-    def start_listen(self):
-        threading.Thread(target=self.mic,daemon=True).start()
         
     def start(self):
         self.root.mainloop()

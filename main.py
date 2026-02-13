@@ -13,7 +13,7 @@ SCREEN_W, SCREEN_H = pyautogui.size()
 # ================== OBJECTS ==================
 v = vision()
 ava = AVA()
-ui = AVA_UI()
+ui = AVA_UI(ava.mode)
 
 last_action_time = 0
 voice_thread = None
